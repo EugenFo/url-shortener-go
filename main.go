@@ -59,15 +59,23 @@ func saveHandler(w http.ResponseWriter, r *http.Request) {
 	mockData = append(mockData, jsonData{ID: lastID, LongURL: parsedData, ShortURL: shortURL, CreateDate: timeNow})
 }
 
+func redirectPage(w http.ResponseWriter, r *http.Request) {
+	// search in MongoDDB for the given id in the URL and redirect to the longurl behind the id
+	// atm it redirects to the url which is typed after the slash
+	params := mux.Vars(r)
+	http.Redirect(w, r, "https://"+params["id"], http.StatusMovedPermanently)
+}
+
 func main() {
 	r := mux.NewRouter()
 	// write init mock data into slice
 	now := time.Now()
 	mockData = append(mockData, jsonData{ID: 1, LongURL: "google.com", ShortURL: "random!", CreateDate: now})
-	mockData = append(mockData, jsonData{ID: 2, LongURL: "twitter.com", ShortURL: "random!", CreateDate: now})
+	mockData = append(mockData, jsonData{ID: 2, LongURL: "twitter.com", ShortURL: "random!2", CreateDate: now})
 
 	// Route Handler
 	r.HandleFunc("/", mainPage).Methods("GET")
+	r.HandleFunc("/{id}", redirectPage).Methods("GET")
 	r.HandleFunc("/get/", getHandler).Methods("GET")
 	r.HandleFunc("/save/", saveHandler).Methods("POST")
 
