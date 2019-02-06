@@ -20,13 +20,11 @@ import (
 
 // mock data Struct
 type jsonData struct {
-	ID         int       `json:"_id"`
-	LongURL    string    `json:"longurl"`
-	ShortURL   string    `json:"shorturl"`
-	CreateDate time.Time `json:"createDate"`
+	ID         int       `json:"ID"`
+	LongURL    string    `json:"LongURL"`
+	ShortURL   string    `json:"ShortURL"`
+	CreateDate time.Time `json:"CreateDate"`
 }
-
-var mockData []jsonData
 
 func mainPage(w http.ResponseWriter, r *http.Request) {
 	tmpl, _ := template.ParseFiles("static/index.html")
@@ -36,17 +34,44 @@ func mainPage(w http.ResponseWriter, r *http.Request) {
 // func to get all the item in the slice. Just for debug purpose
 func getHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(mockData)
+
+	mongoIP := "mongodb://127.0.0.1:27017"
+	ctx, cancle := context.WithTimeout(context.Background(), 10*time.Second)
+	client, err := mongo.Connect(ctx, mongoIP)
+	if err != nil {
+		fmt.Println("MongoDB connection has an error:", err)
+	}
+	defer cancle()
+	newCollection := client.Database("testdb").Collection("testCollection")
+
+	cur, err := newCollection.Find(ctx, bson.M{})
+	if err != nil {
+		fmt.Println("error while fetching all data", err)
+	}
+	defer cur.Close(ctx)
+	var rst bson.M
+	representData := []string{}
+	for cur.Next(ctx) {
+		err := cur.Decode(&rst)
+		if err != nil {
+			fmt.Println("error while decoding:", err)
+		}
+		/* 		for k := range rst {
+			fmt.Println("Key:", k, "value:", rst[k])
+		} */
+		res1, _ := json.Marshal(rst)
+		fmt.Println("string:", string(res1))
+		representData = append(representData, string(res1))
+
+	}
+	fmt.Println("rst:", rst)
+	// json.NewEncoder(w).Encode(rst)
+	json.NewEncoder(w).Encode(representData)
 }
 
 // atm it just copies data into the slice, passed by a form.
 func saveHandler(w http.ResponseWriter, r *http.Request) {
 	parsedData := r.FormValue("longUrlForm")
-
-	// lookup the last ID in the slice and adds 1
-	// pseudo "auto increment"
-	lastID := mockData[len(mockData)-1].ID + 1
-	fmt.Println(strconv.Itoa(lastID))
 
 	// connect to Database
 	mongoIP := "mongodb://127.0.0.1:27017"
@@ -76,9 +101,6 @@ func saveHandler(w http.ResponseWriter, r *http.Request) {
 	// converts int64 into string and creates an SHA1 hash
 	hash := sha1.Sum([]byte(strconv.FormatInt(timeUnix, 10)))
 	shortURL := hex.EncodeToString(hash[:3])
-	fmt.Println(shortURL)
-
-	mockData = append(mockData, jsonData{ID: lastID, LongURL: parsedData, ShortURL: shortURL, CreateDate: timeNow})
 
 	// save to database
 	res2, err := saveCollection.InsertOne(ctx, bson.M{"ID": int(res), "LongURL": parsedData, "ShortURL": shortURL, "CreateDate": timeNow})
@@ -114,11 +136,6 @@ func redirectPage(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	r := mux.NewRouter()
-	// write init mock data into slice
-	now := time.Now()
-	mockData = append(mockData, jsonData{ID: 1, LongURL: "google.com", ShortURL: "random!", CreateDate: now})
-	mockData = append(mockData, jsonData{ID: 2, LongURL: "twitter.com", ShortURL: "random!2", CreateDate: now})
-
 	// create MongoDB connection
 	/* mongoIP := "mongodb://localhost:27017"
 	ctx, cancle := context.WithTimeout(context.Background(), 2*time.Second)
