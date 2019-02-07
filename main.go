@@ -12,18 +12,17 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/gorilla/mux"
 	"github.com/mongodb/mongo-go-driver/bson"
 	"github.com/mongodb/mongo-go-driver/mongo"
-
-	"github.com/gorilla/mux"
 )
 
-// mock data Struct
 type jsonData struct {
-	ID         int       `json:"ID"`
-	LongURL    string    `json:"LongURL"`
-	ShortURL   string    `json:"ShortURL"`
-	CreateDate time.Time `json:"CreateDate"`
+	ID json.Number `json:"ID,Number"`
+	//	_ID        string `json:"_id"`
+	LongURL  string `json:"LongURL"`
+	ShortURL string `json:"ShortURL"`
+	//CreateDate time.Time `json:"CreateDate"`
 }
 
 func mainPage(w http.ResponseWriter, r *http.Request) {
@@ -44,32 +43,31 @@ func getHandler(w http.ResponseWriter, r *http.Request) {
 	defer cancle()
 	newCollection := client.Database("testdb").Collection("testCollection")
 
+	// cursor to iterate through the found documents
 	cur, err := newCollection.Find(ctx, bson.M{})
 	if err != nil {
 		fmt.Println("error while fetching all data", err)
 	}
 	defer cur.Close(ctx)
 	var rst bson.M
-	representData := []string{}
+	var p jsonData
 	for cur.Next(ctx) {
 		err := cur.Decode(&rst)
 		if err != nil {
 			fmt.Println("error while decoding:", err)
 		}
-		/* 		for k := range rst {
-			fmt.Println("Key:", k, "value:", rst[k])
-		} */
-		res1, _ := json.Marshal(rst)
-		fmt.Println("string:", string(res1))
-		representData = append(representData, string(res1))
 
+		res1, _ := json.Marshal(rst)
+
+		err = json.Unmarshal(res1, &p)
+		if err != nil {
+			fmt.Println("error:", err)
+		}
+		json.NewEncoder(w).Encode(p)
 	}
-	fmt.Println("rst:", rst)
-	// json.NewEncoder(w).Encode(rst)
-	json.NewEncoder(w).Encode(representData)
+
 }
 
-// atm it just copies data into the slice, passed by a form.
 func saveHandler(w http.ResponseWriter, r *http.Request) {
 	parsedData := r.FormValue("longUrlForm")
 
