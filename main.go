@@ -61,6 +61,18 @@ func saveHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		fmt.Println("save error:", err)
 	}
+
+	type htmlData struct {
+		SURL string
+		URL  string
+	}
+
+	tmpl, err := template.ParseFiles("static/success.html")
+	if err != nil {
+		fmt.Println("error while processing data for template:", err)
+	}
+	p := htmlData{SURL: shortURL, URL: r.Host}
+	tmpl.Execute(w, p)
 }
 
 func redirectPage(w http.ResponseWriter, r *http.Request) {
